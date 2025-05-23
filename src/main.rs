@@ -17,7 +17,7 @@ use rust_embed::RustEmbed;
 use std::{
     ffi::OsString,
     fs,
-    io::{self, BufRead},
+    io::{self, BufRead, Stdout},
     num,
     path::PathBuf,
     str,
@@ -235,7 +235,23 @@ fn main() -> io::Result<()> {
         terminal::EnterAlternateScreen,
     )?;
     terminal.clear()?;
+    let result = alternate_main(terminal, config, opt, contents);
+    cleanup()?;
+    result
+}
 
+fn cleanup() -> io::Result<()> {
+    terminal::disable_raw_mode()?;
+    execute!(
+        io::stdout(),
+        cursor::RestorePosition,
+        cursor::Show,
+        terminal::LeaveAlternateScreen,
+    )?;
+    Ok(())
+}
+
+fn alternate_main(mut terminal: Terminal<CrosstermBackend<Stdout>>, config: Config, opt: Opt, contents: Vec<String>) -> io::Result<()> {
     let mut state = State::Test(Test::new(contents, !opt.no_backtrack, opt.sudden_death));
 
     state.render_into(&mut terminal, &config)?;
@@ -321,14 +337,6 @@ fn main() -> io::Result<()> {
 
         state.render_into(&mut terminal, &config)?;
     }
-
-    terminal::disable_raw_mode()?;
-    execute!(
-        io::stdout(),
-        cursor::RestorePosition,
-        cursor::Show,
-        terminal::LeaveAlternateScreen,
-    )?;
 
     Ok(())
 }
