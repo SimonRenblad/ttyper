@@ -38,7 +38,7 @@ struct Opt {
     debug: bool,
 
     /// Specify word count
-    #[arg(short, long, value_name = "N", default_value = "50")]
+    #[arg(short, long, value_name = "N", default_value = "30")]
     words: num::NonZeroUsize,
 
     /// Use config file
