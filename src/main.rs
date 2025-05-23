@@ -64,11 +64,19 @@ struct Opt {
     /// Enable sudden death mode to restart on first error
     #[arg(long)]
     sudden_death: bool,
+
+    /// Disables word shuffling
+    #[arg(long)]
+    no_shuffle: bool,
+
+    // No word limit, read the whole input if possible
+    #[arg(long)]
+    no_limit: bool,
 }
 
 impl Opt {
     fn gen_contents(&self) -> Option<Vec<String>> {
-        match &self.contents {
+        let mut contents: Vec<String> = match &self.contents {
             Some(path) => {
                 let lines: Vec<String> = if path.as_os_str() == "-" {
                     std::io::stdin()
@@ -83,13 +91,7 @@ impl Opt {
                         .map_while(Result::ok)
                         .collect()
                 };
-
-                let contents: Vec<String> = lines.iter().map(String::from).collect();
-                if contents.is_empty() {
-                    None
-                } else {
-                    Some(contents)
-                }
+                lines.iter().map(String::from).collect()
             }
             None => {
                 let lang_name = self
@@ -108,24 +110,31 @@ impl Opt {
                             .map(|f| f.data.into_owned())
                     })?;
 
-                let mut rng = thread_rng();
-
-                let mut language: Vec<&str> = str::from_utf8(&bytes)
+                str::from_utf8(&bytes)
                     .expect("Language file had non-utf8 encoding.")
                     .lines()
-                    .collect();
-                language.shuffle(&mut rng);
-
-                let mut contents: Vec<_> = language
-                    .into_iter()
-                    .cycle()
-                    .take(self.words.get())
                     .map(ToOwned::to_owned)
-                    .collect();
-                contents.shuffle(&mut rng);
-
-                Some(contents)
+                    .collect()
             }
+        };
+
+        if !self.no_shuffle {
+            let mut rng = thread_rng();
+            contents.shuffle(&mut rng);
+        }
+
+        if !self.no_limit {
+            contents = contents 
+                .into_iter()
+                .cycle()
+                .take(self.words.get())
+                .collect();
+        }
+
+        if contents.is_empty() {
+            None
+        } else {
+            Some(contents)
         }
     }
 
