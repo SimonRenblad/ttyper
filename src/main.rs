@@ -84,7 +84,12 @@ impl Opt {
                         .collect()
                 };
 
-                Some(lines.iter().map(String::from).collect())
+                let contents: Vec<String> = lines.iter().map(String::from).collect();
+                if contents.is_empty() {
+                    None
+                } else {
+                    Some(contents)
+                }
             }
             None => {
                 let lang_name = self
