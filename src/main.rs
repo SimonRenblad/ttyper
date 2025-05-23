@@ -306,9 +306,9 @@ fn alternate_main(mut terminal: Terminal<CrosstermBackend<Stdout>>, config: Conf
                     ..
                 }) => {
                     state = State::Test(Test::new(
-                        opt.gen_contents().expect(
-                            "Couldn't get test contents. Make sure the specified language actually exists.",
-                        ),
+                        opt.gen_contents().ok_or(
+                            io::Error::other("Couldn't get test contents. Make sure the specified language actually exists."),
+                        )?,
                         !opt.no_backtrack,
                         opt.sudden_death
                     ));
