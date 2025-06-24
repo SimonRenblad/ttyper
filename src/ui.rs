@@ -10,6 +10,7 @@ use ratatui::{
     symbols::Marker,
     text::{Line, Span, Text},
     widgets::{Axis, Block, Borders, Chart, Dataset, GraphType, Paragraph, Widget},
+    style,
 };
 use results::Fraction;
 
@@ -100,7 +101,7 @@ impl ThemedWidget for &Test {
         input.render(buf);
 
         let target_lines: Vec<Line> = {
-            let words = words_to_spans(&self.words, self.current_word, theme);
+            let words = words_to_spans(&self.words, self.current_word, theme, self.look_ahead);
 
             let mut lines: Vec<Line> = Vec::new();
             let mut current_line: Vec<Span> = Vec::new();
@@ -137,6 +138,7 @@ fn words_to_spans<'a>(
     words: &'a [TestWord],
     current_word: usize,
     theme: &'a Theme,
+    look_ahead: Option<usize>,
 ) -> Vec<Vec<Span<'a>>> {
     let mut spans = Vec::new();
 
@@ -144,11 +146,27 @@ fn words_to_spans<'a>(
         let parts = split_typed_word(word);
         spans.push(word_parts_to_spans(parts, theme));
     }
+    let curr = &words[current_word];
+    if look_ahead.is_some() && !(current_word == 0 && curr.progress.is_empty()) {
+        let parts = vec![((&words[current_word]).text.clone(), Status::LookAheadBlock)];
+        spans.push(word_parts_to_spans(parts, theme));
+    } else {
+        let parts_current = split_current_word(&words[current_word]);
+        spans.push(word_parts_to_spans(parts_current, theme));
+    }
 
-    let parts_current = split_current_word(&words[current_word]);
-    spans.push(word_parts_to_spans(parts_current, theme));
+    let next_word: usize = if look_ahead.is_some() && !(current_word == 0 && curr.progress.is_empty()) {
+        let l = look_ahead.unwrap();
+        for i in current_word + 1..current_word + l {
+            let parts = vec![((&words[i]).text.clone(), Status::LookAheadBlock)];
+            spans.push(word_parts_to_spans(parts, theme));
+        }
+        current_word + l
+    } else {
+        current_word + 1
+    };
 
-    for word in &words[current_word + 1..] {
+    for word in &words[next_word..] {
         let parts = vec![(word.text.clone(), Status::Untyped)];
         spans.push(word_parts_to_spans(parts, theme));
     }
@@ -165,6 +183,7 @@ enum Status {
     Cursor,
     Untyped,
     Overtyped,
+    LookAheadBlock,
 }
 
 fn split_current_word(word: &TestWord) -> Vec<(String, Status)> {
@@ -260,6 +279,7 @@ fn word_parts_to_spans(parts: Vec<(String, Status)>, theme: &Theme) -> Vec<Span<
             Status::CurrentIncorrect => theme.prompt_current_incorrect,
             Status::Cursor => theme.prompt_current_untyped.patch(theme.prompt_cursor),
             Status::Overtyped => theme.prompt_incorrect,
+            Status::LookAheadBlock => style::Style::default().fg(style::Color::Black).bg(style::Color::Black),
         };
 
         spans.push(Span::styled(text, style));

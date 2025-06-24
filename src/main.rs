@@ -72,6 +72,10 @@ struct Opt {
     // No word limit, read the whole input if possible
     #[arg(long)]
     no_limit: bool,
+
+    // Block out the next n words (including current one)
+    #[arg(long)]
+    look_ahead: Option<usize>
 }
 
 impl Opt {
@@ -261,7 +265,7 @@ fn cleanup() -> io::Result<()> {
 }
 
 fn alternate_main(mut terminal: Terminal<CrosstermBackend<Stdout>>, config: Config, opt: Opt, contents: Vec<String>) -> io::Result<()> {
-    let mut state = State::Test(Test::new(contents, !opt.no_backtrack, opt.sudden_death));
+    let mut state = State::Test(Test::new(contents, !opt.no_backtrack, opt.sudden_death, opt.look_ahead));
 
     state.render_into(&mut terminal, &config)?;
     loop {
@@ -310,7 +314,8 @@ fn alternate_main(mut terminal: Terminal<CrosstermBackend<Stdout>>, config: Conf
                             io::Error::other("Couldn't get test contents. Make sure the specified language actually exists."),
                         )?,
                         !opt.no_backtrack,
-                        opt.sudden_death
+                        opt.sudden_death,
+                        opt.look_ahead
                     ));
                 }
                 Event::Key(KeyEvent {
@@ -332,6 +337,7 @@ fn alternate_main(mut terminal: Terminal<CrosstermBackend<Stdout>>, config: Conf
                         practice_words,
                         !opt.no_backtrack,
                         opt.sudden_death,
+                        opt.look_ahead,
                     ));
                 }
                 Event::Key(KeyEvent {
