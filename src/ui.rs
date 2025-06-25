@@ -157,11 +157,12 @@ fn words_to_spans<'a>(
 
     let next_word: usize = if look_ahead.is_some() && !(current_word == 0 && curr.progress.is_empty()) {
         let l = look_ahead.unwrap();
-        for i in current_word + 1..current_word + l {
-            let parts = vec![((&words[i]).text.clone(), Status::LookAheadBlock)];
+        let next_w = std::cmp::min(current_word + l, words.len());
+        for word in &words[current_word + 1..next_w] {
+            let parts = vec![(word.text.clone(), Status::LookAheadBlock)];
             spans.push(word_parts_to_spans(parts, theme));
         }
-        current_word + l
+        next_w
     } else {
         current_word + 1
     };
