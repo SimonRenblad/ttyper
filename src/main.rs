@@ -46,7 +46,7 @@ struct Opt {
     config: Option<PathBuf>,
 
     /// Specify test language in file
-    #[arg(long, value_name = "PATH")]
+    #[arg(short = 'f', long, value_name = "PATH")]
     language_file: Option<PathBuf>,
 
     /// Specify test language
@@ -54,7 +54,7 @@ struct Opt {
     language: Option<String>,
 
     /// List installed languages
-    #[arg(long)]
+    #[arg(short = 'v', long)]
     list_languages: bool,
 
     /// Disable backtracking to completed words
@@ -128,7 +128,7 @@ impl Opt {
         }
 
         if !self.no_limit {
-            contents = contents 
+            contents = contents
                 .into_iter()
                 .cycle()
                 .take(self.words.get())
