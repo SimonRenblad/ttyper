@@ -17,7 +17,7 @@ rust-embed = "^8.2"
 toml = "^0.8"
 
 [dependencies.ratatui]
-version = "^0.25"
+git = "https://github.com/ratatui/ratatui"
 
 [dependencies.rand]
 version = "^0.8"

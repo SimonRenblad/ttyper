@@ -405,7 +405,7 @@ impl ThemedWidget for &results::Results {
 
             let wpm_datasets = vec![Dataset::default()
                 .name("WPM")
-                .marker(Marker::Braille)
+                .marker(Marker::Sextant)
                 .graph_type(GraphType::Line)
                 .style(theme.results_chart)
                 .data(&wpm_sma)];
@@ -431,7 +431,7 @@ impl ThemedWidget for &results::Results {
                             (y_label_min..y_label_max)
                                 .step_by(5)
                                 .map(|n| Span::raw(format!("{}", n)))
-                                .collect(),
+                                .collect::<Vec<_>>(),
                         ),
                 );
             wpm_chart.render(res_chunks[1], buf);

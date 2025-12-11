@@ -12,7 +12,7 @@ use crossterm::{
     execute, terminal,
 };
 use rand::{seq::SliceRandom, thread_rng};
-use ratatui::{backend::CrosstermBackend, terminal::Terminal};
+use ratatui::{backend::CrosstermBackend, Terminal};
 use rust_embed::RustEmbed;
 use std::{
     ffi::OsString,
@@ -194,7 +194,7 @@ enum State {
 }
 
 impl State {
-    fn render_into<B: ratatui::backend::Backend>(
+    fn render_into<B: ratatui::backend::Backend<Error = std::io::Error>>(
         &self,
         terminal: &mut Terminal<B>,
         config: &Config,
@@ -202,12 +202,12 @@ impl State {
         match self {
             State::Test(test) => {
                 terminal.draw(|f| {
-                    f.render_widget(config.theme.apply_to(test), f.size());
+                    f.render_widget(config.theme.apply_to(test), f.area());
                 })?;
             }
             State::Results(results) => {
                 terminal.draw(|f| {
-                    f.render_widget(config.theme.apply_to(results), f.size());
+                    f.render_widget(config.theme.apply_to(results), f.area());
                 })?;
             }
         }
