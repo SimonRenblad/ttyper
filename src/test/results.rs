@@ -61,6 +61,23 @@ pub struct Results {
     pub missed_words: Vec<String>,
 }
 
+// Convert CPS to WPM (clicks per second)
+const WPM_PER_CPS: f64 = 12.0;
+
+// i only really care about raw wpm, adjusted wpm, accuracy
+impl fmt::Display for Results {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let wpm = self.timing.overall_cps * WPM_PER_CPS;
+        let accuracy = f64::from(self.accuracy.overall);
+        let adjusted = wpm * accuracy;
+        let accuracy_percent = accuracy * 100f64;
+        write!(f,"Raw WPM: {:.1}\n", wpm)?;
+        write!(f,"Accuracy: {:.1}%\n", accuracy_percent)?;
+        write!(f,"Adjusted WPM: {:.1}\n", adjusted)?;
+        Ok(())
+    }
+}
+
 impl From<&Test> for Results {
     fn from(test: &Test) -> Self {
         let events: Vec<&super::TestEvent> =

@@ -190,7 +190,6 @@ impl Opt {
 
 enum State {
     Test(Test),
-    Results(Results),
 }
 
 impl State {
@@ -203,11 +202,6 @@ impl State {
             State::Test(test) => {
                 terminal.draw(|f| {
                     f.render_widget(config.theme.apply_to(test), f.area());
-                })?;
-            }
-            State::Results(results) => {
-                terminal.draw(|f| {
-                    f.render_widget(config.theme.apply_to(results), f.area());
                 })?;
             }
         }
@@ -250,7 +244,13 @@ fn main() -> io::Result<()> {
     terminal.clear()?;
     let result = alternate_main(terminal, config, opt, contents);
     cleanup()?;
-    result
+    match result? {
+       Some(res) => {
+           print!("{}", res);
+           Ok(())
+       }
+       None => Ok(())
+    }
 }
 
 fn cleanup() -> io::Result<()> {
@@ -264,7 +264,7 @@ fn cleanup() -> io::Result<()> {
     Ok(())
 }
 
-fn alternate_main(mut terminal: Terminal<CrosstermBackend<Stdout>>, config: Config, opt: Opt, contents: Vec<String>) -> io::Result<()> {
+fn alternate_main(mut terminal: Terminal<CrosstermBackend<Stdout>>, config: Config, opt: Opt, contents: Vec<String>) -> io::Result<Option<Results>> {
     let mut state = State::Test(Test::new(contents, !opt.no_backtrack, opt.sudden_death, opt.look_ahead));
 
     state.render_into(&mut terminal, &config)?;
@@ -278,18 +278,12 @@ fn alternate_main(mut terminal: Terminal<CrosstermBackend<Stdout>>, config: Conf
                 kind: KeyEventKind::Press,
                 modifiers: KeyModifiers::CONTROL,
                 ..
-            }) => break,
-            Event::Key(KeyEvent {
+            } | KeyEvent {
                 code: KeyCode::Esc,
                 kind: KeyEventKind::Press,
                 modifiers: KeyModifiers::NONE,
                 ..
-            }) => match state {
-                State::Test(ref test) => {
-                    state = State::Results(Results::from(test));
-                }
-                State::Results(_) => break,
-            },
+            }) => break,
             _ => {}
         }
 
@@ -298,60 +292,14 @@ fn alternate_main(mut terminal: Terminal<CrosstermBackend<Stdout>>, config: Conf
                 if let Event::Key(key) = event {
                     test.handle_key(key);
                     if test.complete {
-                        state = State::Results(Results::from(&*test));
+                        return Ok(Some((&*test).into()))
                     }
                 }
             }
-            State::Results(ref result) => match event {
-                Event::Key(KeyEvent {
-                    code: KeyCode::Char('r'),
-                    kind: KeyEventKind::Press,
-                    modifiers: KeyModifiers::NONE,
-                    ..
-                }) => {
-                    state = State::Test(Test::new(
-                        opt.gen_contents().ok_or(
-                            io::Error::other("Couldn't get test contents. Make sure the specified language actually exists."),
-                        )?,
-                        !opt.no_backtrack,
-                        opt.sudden_death,
-                        opt.look_ahead
-                    ));
-                }
-                Event::Key(KeyEvent {
-                    code: KeyCode::Char('p'),
-                    kind: KeyEventKind::Press,
-                    modifiers: KeyModifiers::NONE,
-                    ..
-                }) => {
-                    if result.missed_words.is_empty() {
-                        continue;
-                    }
-                    // repeat each missed word 5 times
-                    let mut practice_words: Vec<String> = (result.missed_words)
-                        .iter()
-                        .flat_map(|w| vec![w.clone(); 5])
-                        .collect();
-                    practice_words.shuffle(&mut thread_rng());
-                    state = State::Test(Test::new(
-                        practice_words,
-                        !opt.no_backtrack,
-                        opt.sudden_death,
-                        opt.look_ahead,
-                    ));
-                }
-                Event::Key(KeyEvent {
-                    code: KeyCode::Char('q'),
-                    kind: KeyEventKind::Press,
-                    modifiers: KeyModifiers::NONE,
-                    ..
-                }) => break,
-                _ => {}
-            },
         }
 
         state.render_into(&mut terminal, &config)?;
     }
 
-    Ok(())
+    Ok(None)
 }

@@ -1,24 +1,14 @@
 use crate::config::Theme;
 
-use super::test::{results, Test, TestWord};
+use super::test::{Test, TestWord};
 
-use crossterm::event::KeyCode;
-use crossterm::event::KeyEvent;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Rect},
-    symbols::Marker,
-    text::{Line, Span, Text},
-    widgets::{Axis, Block, Borders, Chart, Dataset, GraphType, Paragraph, Widget},
+    text::{Line, Span},
+    widgets::{Block, Borders, Paragraph, Widget},
     style,
 };
-use results::Fraction;
-
-// Convert CPS to WPM (clicks per second)
-const WPM_PER_CPS: f64 = 12.0;
-
-// Width of the moving average window for the WPM chart
-const WPM_SMA_WIDTH: usize = 10;
 
 #[derive(Clone)]
 struct SizedBlock<'a> {
@@ -287,156 +277,6 @@ fn word_parts_to_spans(parts: Vec<(String, Status)>, theme: &Theme) -> Vec<Span<
     }
     spans.push(Span::styled(" ", theme.prompt_untyped));
     spans
-}
-
-impl ThemedWidget for &results::Results {
-    fn render(self, area: Rect, buf: &mut Buffer, theme: &Theme) {
-        buf.set_style(area, theme.default);
-
-        // Chunks
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Length(1)])
-            .split(area);
-        let res_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .margin(1) // Graph looks tremendously better with just a little margin
-            .constraints([Constraint::Ratio(1, 3), Constraint::Ratio(2, 3)])
-            .split(chunks[0]);
-        let info_chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
-            .split(res_chunks[0]);
-
-        let msg = if self.missed_words.is_empty() {
-            "Press 'q' to quit or 'r' for another test"
-        } else {
-            "Press 'q' to quit, 'r' for another test or 'p' to practice missed words"
-        };
-
-        let exit = Span::styled(msg, theme.results_restart_prompt);
-        buf.set_span(chunks[1].x, chunks[1].y, &exit, chunks[1].width);
-
-        // Sections
-        let mut overview_text = Text::styled("", theme.results_overview);
-        overview_text.extend([
-            Line::from(format!(
-                "Adjusted WPM: {:.1}",
-                self.timing.overall_cps * WPM_PER_CPS * f64::from(self.accuracy.overall)
-            )),
-            Line::from(format!(
-                "Accuracy: {:.1}%",
-                f64::from(self.accuracy.overall) * 100f64
-            )),
-            Line::from(format!(
-                "Raw WPM: {:.1}",
-                self.timing.overall_cps * WPM_PER_CPS
-            )),
-            Line::from(format!("Correct Keypresses: {}", self.accuracy.overall)),
-        ]);
-        let overview = Paragraph::new(overview_text).block(
-            Block::default()
-                .title(Span::styled("Overview", theme.title))
-                .borders(Borders::ALL)
-                .border_type(theme.border_type)
-                .border_style(theme.results_overview_border),
-        );
-        overview.render(info_chunks[0], buf);
-
-        let mut worst_keys: Vec<(&KeyEvent, &Fraction)> = self
-            .accuracy
-            .per_key
-            .iter()
-            .filter(|(key, _)| matches!(key.code, KeyCode::Char(_)))
-            .collect();
-        worst_keys.sort_unstable_by_key(|x| x.1);
-
-        let mut worst_text = Text::styled("", theme.results_worst_keys);
-        worst_text.extend(
-            worst_keys
-                .iter()
-                .filter_map(|(key, acc)| {
-                    if let KeyCode::Char(character) = key.code {
-                        let key_accuracy = f64::from(**acc) * 100.0;
-                        if key_accuracy != 100.0 {
-                            Some(format!("- {} at {:.1}% accuracy", character, key_accuracy))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                })
-                .take(5)
-                .map(Line::from),
-        );
-        let worst = Paragraph::new(worst_text).block(
-            Block::default()
-                .title(Span::styled("Worst Keys", theme.title))
-                .borders(Borders::ALL)
-                .border_type(theme.border_type)
-                .border_style(theme.results_worst_keys_border),
-        );
-        worst.render(info_chunks[1], buf);
-
-        let wpm_sma: Vec<(f64, f64)> = self
-            .timing
-            .per_event
-            .windows(WPM_SMA_WIDTH)
-            .enumerate()
-            .map(|(i, window)| {
-                (
-                    (i + WPM_SMA_WIDTH) as f64,
-                    window.len() as f64 / window.iter().copied().sum::<f64>() * WPM_PER_CPS,
-                )
-            })
-            .collect();
-
-        // Render the chart if possible
-        if !wpm_sma.is_empty() {
-            let wpm_sma_min = wpm_sma
-                .iter()
-                .map(|(_, x)| x)
-                .fold(f64::INFINITY, |a, &b| a.min(b));
-            let wpm_sma_max = wpm_sma
-                .iter()
-                .map(|(_, x)| x)
-                .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
-
-            let wpm_datasets = vec![Dataset::default()
-                .name("WPM")
-                .marker(Marker::Sextant)
-                .graph_type(GraphType::Line)
-                .style(theme.results_chart)
-                .data(&wpm_sma)];
-
-            let y_label_min = wpm_sma_min as u16;
-            let y_label_max = (wpm_sma_max as u16).max(y_label_min + 6);
-
-            let wpm_chart = Chart::new(wpm_datasets)
-                .block(Block::default().title(vec![Span::styled("Chart", theme.title)]))
-                .x_axis(
-                    Axis::default()
-                        .title(Span::styled("Keypresses", theme.results_chart_x))
-                        .bounds([0.0, self.timing.per_event.len() as f64]),
-                )
-                .y_axis(
-                    Axis::default()
-                        .title(Span::styled(
-                            "WPM (10-keypress rolling average)",
-                            theme.results_chart_y,
-                        ))
-                        .bounds([wpm_sma_min, wpm_sma_max])
-                        .labels(
-                            (y_label_min..y_label_max)
-                                .step_by(5)
-                                .map(|n| Span::raw(format!("{}", n)))
-                                .collect::<Vec<_>>(),
-                        ),
-                );
-            wpm_chart.render(res_chunks[1], buf);
-        }
-    }
 }
 
 #[cfg(test)]
