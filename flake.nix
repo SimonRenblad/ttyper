@@ -15,6 +15,9 @@
       src = ./.;
       cargoLock = {
         lockFile = ./Cargo.lock;
+        outputHashes = {
+          "ratatui-0.30.0-beta.0" = "sha256-1SVrPoD7l+07HcvdpeSYbe3TZK4nTOHe2dwyx3nLrFE=";
+        };
       };
     };
   in {
