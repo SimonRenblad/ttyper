@@ -4,44 +4,11 @@ use super::test::{Test, TestWord};
 
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::Rect,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Widget},
     style,
 };
-
-#[derive(Clone)]
-struct SizedBlock<'a> {
-    block: Block<'a>,
-    area: Rect,
-}
-
-impl SizedBlock<'_> {
-    fn render(self, buf: &mut Buffer) {
-        self.block.render(self.area, buf)
-    }
-}
-
-trait UsedWidget: Widget {}
-impl UsedWidget for Paragraph<'_> {}
-
-trait DrawInner<T> {
-    fn draw_inner(&self, content: T, buf: &mut Buffer);
-}
-
-impl DrawInner<&Line<'_>> for SizedBlock<'_> {
-    fn draw_inner(&self, content: &Line, buf: &mut Buffer) {
-        let inner = self.block.inner(self.area);
-        buf.set_line(inner.x, inner.y, content, inner.width);
-    }
-}
-
-impl<T: UsedWidget> DrawInner<T> for SizedBlock<'_> {
-    fn draw_inner(&self, content: T, buf: &mut Buffer) {
-        let inner = self.block.inner(self.area);
-        content.render(inner, buf);
-    }
-}
 
 pub trait ThemedWidget {
     fn render(self, area: Rect, buf: &mut Buffer, theme: &Theme);
@@ -69,27 +36,6 @@ impl ThemedWidget for &Test {
     fn render(self, area: Rect, buf: &mut Buffer, theme: &Theme) {
         buf.set_style(area, theme.default);
 
-        // Chunks
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(3), Constraint::Length(6)])
-            .split(area);
-
-        // Sections
-        let input = SizedBlock {
-            block: Block::default()
-                .title(Line::from(vec![Span::styled("Input", theme.title)]))
-                .borders(Borders::ALL)
-                .border_type(theme.border_type)
-                .border_style(theme.input_border),
-            area: chunks[0],
-        };
-        input.draw_inner(
-            &Line::from(self.words[self.current_word].progress.clone()),
-            buf,
-        );
-        input.render(buf);
-
         let target_lines: Vec<Line> = {
             let words = words_to_spans(&self.words, self.current_word, theme, self.look_ahead);
 
@@ -99,7 +45,7 @@ impl ThemedWidget for &Test {
             for word in words {
                 let word_width: usize = word.iter().map(|s| s.width()).sum();
 
-                if current_width + word_width > chunks[1].width as usize - 2 {
+                if current_width + word_width > area.width as usize - 2 {
                     current_line.push(Span::raw("\n"));
                     lines.push(Line::from(current_line.clone()));
                     current_line.clear();
@@ -120,7 +66,7 @@ impl ThemedWidget for &Test {
                 .border_type(theme.border_type)
                 .border_style(theme.prompt_border),
         );
-        target.render(chunks[1], buf);
+        target.render(area, buf);
     }
 }
 
